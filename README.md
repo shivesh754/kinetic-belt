@@ -2,7 +2,8 @@
 
 A full-stack Machine Learning-based web application that predicts stock prices using historical data and advanced algorithms like LSTM. The project integrates a Python backend with a React frontend to provide real-time predictions and user interaction.
 
-📌 Overview
+📌 Overview:
+
 Stock market prediction is a complex problem due to its dynamic and volatile nature. This project leverages Machine Learning and Deep Learning techniques to analyze historical stock data and forecast future trends.
 The system processes time-series data and uses predictive models to assist users in making better investment decisions.
 
