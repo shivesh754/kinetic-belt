@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { format, subYears } from 'date-fns';
-import { DollarSign, TrendingUp, TrendingDown, Activity, RefreshCw, Search } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Activity, RefreshCw, Search, Heart, Star, ChevronRight } from 'lucide-react';
 import { stockService } from '../services/api';
 import StockChart from '../components/StockChart';
 import MetricsCard from '../components/MetricsCard';
 import DateRangePicker from '../components/DateRangePicker';
 import LoadingSpinner from '../components/LoadingSpinner';
+import WatchlistSidebar from '../components/WatchlistSidebar';
+import { useWatchlist } from '../context/WatchlistContext';
 import companiesData from '../data/companies.json';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const POPULAR_STOCKS = companiesData.slice(0, 1000);
 
@@ -26,6 +29,10 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState(null);
+  const [stockInfo, setStockInfo] = useState(null);
+  const [showSidebar, setShowSidebar] = useState(true);
+
+  const { isInWatchlist, addToWatchlist, removeFromWatchlist } = useWatchlist();
 
   const fetchData = async () => {
     setLoading(true);
@@ -42,7 +49,16 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    fetchData();
+    const fetchAll = async () => {
+      fetchData();
+      try {
+        const info = await stockService.getStockInfo(symbol);
+        setStockInfo(info);
+      } catch (err) {
+        console.error('Info fetch failed', err);
+      }
+    };
+    fetchAll();
   }, [symbol, startDate, endDate]);
 
   const calculateStats = (result) => {
@@ -110,13 +126,40 @@ const Dashboard = () => {
               <Search className="w-4 h-4" />
             </div>
           </div>
-          <button 
-            onClick={fetchData} 
-            className="p-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 transition-colors border border-white/10"
-            title="Refresh Data"
-          >
-            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => isInWatchlist(symbol) ? removeFromWatchlist(symbol) : addToWatchlist(symbol)}
+              className={`p-2.5 rounded-lg transition-all duration-300 border ${
+                isInWatchlist(symbol) 
+                  ? 'bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20' 
+                  : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+              }`}
+              title={isInWatchlist(symbol) ? "Remove from watchlist" : "Add to watchlist"}
+            >
+              <Heart className={`w-5 h-5 ${isInWatchlist(symbol) ? 'fill-red-500' : ''}`} />
+            </button>
+
+            <button 
+              onClick={fetchData} 
+              className="p-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 transition-colors border border-white/10"
+              title="Refresh Data"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+
+            <button 
+              onClick={() => setShowSidebar(!showSidebar)}
+              className={`hidden lg:flex p-2.5 rounded-lg transition-all duration-300 border ${
+                showSidebar 
+                  ? 'bg-accent-green/10 border-accent-green/30 text-accent-green hover:bg-accent-green/20' 
+                  : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/10'
+              }`}
+              title={showSidebar ? "Hide Sidebar" : "Show Sidebar"}
+            >
+              <Star className={`w-5 h-5 ${showSidebar ? 'fill-accent-green' : ''}`} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -157,18 +200,131 @@ const Dashboard = () => {
         />
       </div>
 
-      {/* Main Chart Area */}
-      <div className="glass-panel p-6 h-[550px]">
-        {loading ? (
-          <LoadingSpinner message="Fetching market data..." />
-        ) : error ? (
-          <div className="h-full flex items-center justify-center text-stock-down flex-col bg-red-500/5 rounded-xl border border-red-500/10">
-            <TrendingDown className="w-8 h-8 mb-2 opacity-50" />
-            <p>{error}</p>
-          </div>
-        ) : (
-          <StockChart data={data} />
-        )}
+      {/* Main Content Grid */}
+      <div className="flex flex-col lg:flex-row gap-6 h-[600px]">
+        {/* Main Chart Area */}
+        <div className={`transition-all duration-500 ease-in-out ${showSidebar ? 'lg:w-[75%]' : 'w-full'} glass-panel p-6 relative h-full overflow-hidden`}>
+          {loading ? (
+            <LoadingSpinner message="Fetching market data from yfinance..." />
+          ) : error ? (
+            <div className="h-full flex items-center justify-center text-stock-down flex-col bg-red-500/5 rounded-xl border border-red-500/10">
+              <TrendingDown className="w-8 h-8 mb-2 opacity-50" />
+              <p>{error}</p>
+            </div>
+          ) : (
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-1.5 h-6 bg-accent-green rounded-full" />
+                  <h3 className="text-lg font-bold text-gray-200">Price Action - {symbol}</h3>
+                </div>
+                <div className="flex gap-2">
+                  <span className="text-xs bg-accent-green/10 text-accent-green px-2 py-1 rounded border border-accent-green/20">Live Historical</span>
+                  <span className="text-xs bg-white/5 text-gray-400 px-2 py-1 rounded border border-white/10 font-mono italic">5y Period</span>
+                </div>
+              </div>
+              <div className="flex-grow min-h-0">
+                <StockChart data={data} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Info & Watchlist Sidebar Container */}
+        <div className="flex flex-col gap-6 lg:w-[25%] h-full overflow-hidden">
+          <AnimatePresence mode="wait">
+            {showSidebar && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="flex flex-col gap-6 h-full"
+              >
+                {/* Fundamentals Card */}
+                <div className="glass-panel p-4 flex flex-col gap-3 min-h-[220px]">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <Activity className="w-3.5 h-3.5 text-blue-400" />
+                    Fundamentals
+                  </h3>
+                  {stockInfo ? (
+                    <div className="grid grid-cols-2 gap-y-3 pt-2">
+                      <div>
+                        <p className="text-[10px] text-gray-500">Market Cap</p>
+                        <p className="text-sm font-semibold text-gray-200">
+                          ${(stockInfo.marketCap / 1e12).toFixed(2)}T
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500">P/E Ratio</p>
+                        <p className="text-sm font-semibold text-gray-200">{stockInfo.peRatio?.toFixed(2) || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500">Div. Yield</p>
+                        <p className="text-sm font-semibold text-gray-200">{(stockInfo.dividendYield * 100).toFixed(2)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-500">Sector</p>
+                        <p className="text-sm font-semibold text-gray-200 truncate pr-2">{stockInfo.sector}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center opacity-20">
+                      <p className="text-xs italic">Loading info...</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* News Sentiment Section */}
+                <div className="glass-panel p-4 flex flex-col gap-3 flex-1 overflow-hidden min-h-[300px]">
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <TrendingUp className="w-3.5 h-3.5 text-accent-green" />
+                    Recent News & Sentiment
+                  </h3>
+                  <div className="flex-1 overflow-y-auto space-y-3 mt-2 pr-1 custom-scrollbar">
+                    {stockInfo?.news?.map((n, idx) => (
+                      <a 
+                        key={idx} 
+                        href={n.link} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="block p-3 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all group"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <p className="text-xs font-medium text-gray-300 group-hover:text-white transition-colors line-clamp-2 leading-relaxed">
+                            {n.title}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-[9px] text-gray-500">{n.publisher}</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded ${
+                            idx % 3 === 0 ? 'bg-green-500/10 text-green-400' : 'bg-gray-500/10 text-gray-400'
+                          }`}>
+                            {idx % 3 === 0 ? 'Positive' : 'Neutral'}
+                          </span>
+                        </div>
+                      </a>
+                    ))}
+                    {!stockInfo?.news?.length && (
+                      <p className="text-[10px] text-gray-600 italic text-center py-10">No recent news found for this ticker.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex-1 min-h-[200px]">
+                  <WatchlistSidebar onSelect={(sym) => {
+                    const found = companiesData.find(c => c.symbol === sym);
+                    if (found) {
+                      setDisplayName(`${found.name} (${found.symbol})`);
+                      setSymbol(found.symbol);
+                    } else {
+                      setSymbol(sym);
+                    }
+                  }} />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );

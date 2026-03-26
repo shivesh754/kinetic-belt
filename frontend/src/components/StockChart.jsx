@@ -1,129 +1,80 @@
-import { useState } from 'react';
-import { 
-  LineChart, Line, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, 
-  Tooltip, Legend, ResponsiveContainer, ComposedChart 
-} from 'recharts';
-import { Activity } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { createChart, ColorType } from 'lightweight-charts';
 
-const StockChart = ({ data }) => {
-  const [activeToggles, setActiveToggles] = useState({
-    open: true,
-    high: false,
-    low: false,
-    close: true
-  });
+const StockChart = ({ data, colors = {} }) => {
+  const chartContainerRef = useRef();
 
-  const handleToggle = (key) => {
-    setActiveToggles(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }));
-  };
+  useEffect(() => {
+    const {
+      backgroundColor = '#0b1120',
+      lineColor = '#10b981',
+      textColor = '#94a3b8',
+      areaTopColor = 'rgba(16, 185, 129, 0.2)',
+      areaBottomColor = 'rgba(16, 185, 129, 0)',
+    } = colors;
 
-  if (!data || data.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center text-gray-400">
-        <Activity className="w-6 h-6 mr-2 animate-pulse" />
-        No data available for the selected range
-      </div>
-    );
-  }
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: backgroundColor },
+        textColor,
+      },
+      grid: {
+        vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
+        horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
+      },
+      width: chartContainerRef.current.clientWidth,
+      height: 400,
+      timeScale: {
+        borderVisible: false,
+      },
+      rightPriceScale: {
+        borderVisible: false,
+      },
+    });
 
-  const chartData = data.dates.map((date, index) => ({
-    date,
-    open: data.open[index],
-    high: data.high[index],
-    low: data.low[index],
-    close: data.close[index],
-    volume: data.volume[index]
-  }));
+    const newSeries = chart.addAreaSeries({
+      lineColor,
+      topColor: areaTopColor,
+      bottomColor: areaBottomColor,
+      lineWidth: 2,
+    });
 
-  const colors = {
-    open: '#3B82F6', // Blue
-    high: '#10B981', // Green
-    low: '#EF4444',  // Red
-    close: '#F59E0B' // Yellow
-  };
-
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="glass-panel p-3 text-sm border-white/20">
-          <p className="font-bold mb-2 text-white">{label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} style={{ color: entry.color }} className="flex justify-between gap-4">
-              <span className="capitalize">{entry.name}:</span>
-              <span className="font-mono">{entry.value.toLocaleString()}</span>
-            </p>
-          ))}
-        </div>
-      );
+    // Format data for lightweight-charts: support { dates: [], close: [] } format
+    let formattedData = [];
+    if (data.dates && data.close) {
+      formattedData = data.dates.map((date, index) => ({
+        time: date,
+        value: data.close[index]
+      }));
+    } else if (Array.isArray(data)) {
+      formattedData = data.map(item => ({
+        time: item.date || item.time,
+        value: item.price || item.close || item.value
+      }));
     }
-    return null;
-  };
 
-  return (
-    <div className="flex flex-col h-full w-full gap-4 relative animate-fade-in">
-      <div className="flex gap-4 mb-2 flex-wrap">
-        {Object.keys(activeToggles).map(key => (
-          <button
-            key={key}
-            onClick={() => handleToggle(key)}
-            className={`px-3 py-1 rounded-full text-xs font-medium transition-all duration-300 border ${
-              activeToggles[key] 
-                ? 'bg-opacity-20 border-opacity-50' 
-                : 'bg-transparent text-gray-500 border-gray-700 hover:text-gray-300'
-            }`}
-            style={{
-              backgroundColor: activeToggles[key] ? colors[key] + '33' : 'transparent',
-              borderColor: activeToggles[key] ? colors[key] : '',
-              color: activeToggles[key] ? colors[key] : ''
-            }}
-          >
-            {key.toUpperCase()}
-          </button>
-        ))}
-      </div>
-      
-      {/* Price Chart */}
-      <div className="h-[300px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#ffffff1a" vertical={false} />
-            <XAxis dataKey="date" stroke="#9ca3af" tick={{ fill: '#9ca3af' }} tickLine={false} />
-            <YAxis stroke="#9ca3af" tick={{ fill: '#9ca3af' }} tickLine={false} domain={['auto', 'auto']} />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend wrapperStyle={{ paddingTop: '20px' }} />
-            
-            {activeToggles.open && <Line type="monotone" dataKey="open" stroke={colors.open} strokeWidth={2} dot={false} activeDot={{ r: 8 }} animationDuration={1500} />}
-            {activeToggles.high && <Line type="monotone" dataKey="high" stroke={colors.high} strokeWidth={2} dot={false} activeDot={{ r: 8 }} animationDuration={1500} />}
-            {activeToggles.low && <Line type="monotone" dataKey="low" stroke={colors.low} strokeWidth={2} dot={false} activeDot={{ r: 8 }} animationDuration={1500} />}
-            {activeToggles.close && <Line type="monotone" dataKey="close" stroke={colors.close} strokeWidth={2} dot={false} activeDot={{ r: 8 }} animationDuration={1500} />}
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+    // Ensure data is sorted by time and filter out duplicates
+    formattedData = formattedData
+      .sort((a, b) => new Date(a.time) - new Date(b.time))
+      .filter((v, i, a) => !i || v.time !== a[i - 1].time);
 
-      {/* Volume Chart */}
-      <div className="h-[120px] w-full mt-4 border-t border-white/10 pt-4">
-        <h4 className="text-xs text-gray-500 mb-2 uppercase tracking-wider font-semibold">Trading Volume</h4>
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 0, right: 30, left: 20, bottom: 0 }}>
-            <Tooltip 
-              cursor={{ fill: '#ffffff1a' }} 
-              contentStyle={{ backgroundColor: '#1C263A', borderColor: '#ffffff33', borderRadius: '8px' }}
-              itemStyle={{ color: '#fff' }}
-            />
-            <Bar dataKey="volume" fill="#8b5cf6" radius={[4, 4, 0, 0]} animationDuration={1500}>
-              {chartData.map((entry, index) => {
-                const isPositive = index === 0 || entry.close >= chartData[index - 1].close;
-                return <Cell key={`cell-${index}`} fill={isPositive ? '#10B981' : '#EF4444'} />;
-              })}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
+    newSeries.setData(formattedData);
+
+    chart.timeScale().fitContent();
+
+    const handleResize = () => {
+      chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      chart.remove();
+    };
+  }, [data, colors]);
+
+  return <div ref={chartContainerRef} className="w-full" />;
 };
 
 export default StockChart;

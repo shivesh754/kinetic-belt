@@ -17,6 +17,8 @@ const Predict = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [isComparing, setIsComparing] = useState(false);
+  const [resultsMap, setResultsMap] = useState({});
 
   useEffect(() => {
     // Fetch available models
@@ -31,20 +33,39 @@ const Predict = () => {
     fetchModels();
   }, []);
 
-  const handlePredict = async (e) => {
-    e.preventDefault();
-    if (!symbol || !days || !model) {
+  const handlePredict = async (e, compareAll = false) => {
+    e?.preventDefault();
+    if (!symbol || !days) {
       setError('Please fill in all fields');
       return;
     }
     
     setLoading(true);
+    setIsComparing(compareAll);
     setError(null);
     setResult(null);
+    setResultsMap({});
     
     try {
-      const data = await stockService.predictStock(symbol.toUpperCase(), days, model);
-      setResult(data);
+      if (compareAll) {
+        const comparisons = {};
+        for (const m of models) {
+          try {
+            const data = await stockService.predictStock(symbol.toUpperCase(), days, m);
+            comparisons[m] = data;
+          } catch (err) {
+            console.error(`Model ${m} failed`, err);
+          }
+        }
+        setResultsMap(comparisons);
+        // Default to the first successful model for the main display
+        const firstModel = Object.keys(comparisons)[0];
+        if (firstModel) setResult(comparisons[firstModel]);
+      } else {
+        const data = await stockService.predictStock(symbol.toUpperCase(), days, model);
+        setResult(data);
+        setResultsMap({ [model]: data });
+      }
     } catch (err) {
       setError('Prediction failed. ' + (err.response?.data?.error || err.message));
     } finally {
@@ -133,8 +154,18 @@ const Predict = () => {
                 disabled={loading}
                 className="btn-primary w-full mt-4 flex items-center justify-center gap-2 py-3"
               >
-                {loading ? 'Processing...' : 'Generate Prediction'}
+                {loading && !isComparing ? 'Running model inference...' : 'Generate Prediction'}
                 {!loading && <Zap className="w-4 h-4" />}
+              </button>
+
+              <button 
+                type="button"
+                onClick={(e) => handlePredict(e, true)}
+                disabled={loading}
+                className="w-full mt-3 flex items-center justify-center gap-2 py-3 rounded-lg border border-accent-green/30 bg-accent-green/5 text-accent-green hover:bg-accent-green/10 transition-all font-medium text-sm"
+              >
+                {loading && isComparing ? 'Comparing all models...' : 'Benchmark All Models'}
+                {!loading && <Activity className="w-4 h-4" />}
               </button>
             </form>
           </div>
@@ -180,10 +211,27 @@ const Predict = () => {
 
               {/* Chart */}
               <div className="glass-panel p-6 animate-slide-up" style={{ animationDelay: '100ms' }}>
-                <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-blue-400" />
-                  Actual vs Predicted Prices
-                </h3>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-blue-400" />
+                    Actual vs Predicted Prices
+                  </h3>
+                  {isComparing && (
+                    <div className="flex bg-white/5 rounded-lg p-1 gap-1">
+                      {Object.keys(resultsMap).map(m => (
+                        <button
+                          key={m}
+                          onClick={() => setResult(resultsMap[m])}
+                          className={`px-3 py-1 text-xs rounded-md transition-all ${
+                            result === resultsMap[m] ? 'bg-accent-green text-white shadow-lg' : 'text-gray-400 hover:text-white'
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <PredictionChart actualData={result.actual_prices} predictedData={result.predicted_prices} />
               </div>
 

@@ -10,45 +10,7 @@ logger = logging.getLogger(__name__)
 auth_bp = Blueprint('auth_bp', __name__)
 
 
-def generate_token(user):
-    """Generate JWT token for a user"""
-    payload = {
-        'user_id': user.id,
-        'email': user.email,
-        'exp': datetime.datetime.utcnow() + datetime.timedelta(
-            hours=current_app.config.get('JWT_EXPIRATION_HOURS', 168)
-        ),
-        'iat': datetime.datetime.utcnow()
-    }
-    token = jwt.encode(payload, current_app.config['SECRET_KEY'], algorithm='HS256')
-    return token
-
-
-def token_required(f):
-    """Decorator to protect routes with JWT authentication"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = None
-        auth_header = request.headers.get('Authorization')
-
-        if auth_header and auth_header.startswith('Bearer '):
-            token = auth_header.split(' ')[1]
-
-        if not token:
-            return jsonify({'error': 'Authentication token is missing'}), 401
-
-        try:
-            payload = jwt.decode(token, current_app.config['SECRET_KEY'], algorithms=['HS256'])
-            current_user = User.query.get(payload['user_id'])
-            if not current_user:
-                return jsonify({'error': 'User not found'}), 401
-        except jwt.ExpiredSignatureError:
-            return jsonify({'error': 'Token has expired'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'error': 'Invalid token'}), 401
-
-        return f(current_user, *args, **kwargs)
-    return decorated
+from utils.auth import generate_token, token_required
 
 
 # ─── Registration ───────────────────────────────────────────────────────────────
@@ -147,6 +109,7 @@ def login():
 # ─── Google OAuth ───────────────────────────────────────────────────────────────
 
 @auth_bp.route('/google', methods=['POST'])
+@auth_bp.route('/google-login', methods=['POST'])
 def google_auth():
     """Authenticate using a Google OAuth credential (ID token from Google Identity Services)"""
     data = request.get_json()
@@ -187,10 +150,12 @@ def google_auth():
                 # Link Google to existing local account
                 user.provider_id = google_user_id
                 user.provider = 'google'
+                user.google_user = True
                 if picture:
                     user.avatar = picture
             elif user.provider_id != google_user_id:
                 user.provider_id = google_user_id
+                user.google_user = True
 
             if picture and not user.avatar:
                 user.avatar = picture
@@ -202,7 +167,8 @@ def google_auth():
                 email=email,
                 avatar=picture or name[0].upper(),
                 provider='google',
-                provider_id=google_user_id
+                provider_id=google_user_id,
+                google_user=True
             )
             db.session.add(user)
             db.session.commit()

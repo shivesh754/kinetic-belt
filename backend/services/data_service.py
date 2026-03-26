@@ -37,6 +37,36 @@ def get_historical_data(symbol, start=None, end=None):
         "volume": df['Volume'].tolist()
     }
 
+def get_stock_info(symbol):
+    """Fetch fundamental data and recent news for sentiment analysis"""
+    logger.info(f"Fetching fundamental data for {symbol}")
+    ticker = yf.Ticker(symbol)
+    info = ticker.info
+    news = ticker.news
+    
+    # Process news to extract headlines for potential sentiment analysis
+    processed_news = []
+    for item in news[:5]: # Take top 5 news items
+        processed_news.append({
+            "title": item.get('title'),
+            "publisher": item.get('publisher'),
+            "link": item.get('link'),
+            "published": item.get('providerPublishTime')
+        })
+
+    return {
+        "symbol": symbol,
+        "name": info.get('longName', symbol),
+        "sector": info.get('sector', 'N/A'),
+        "marketCap": info.get('marketCap', 0),
+        "peRatio": info.get('forwardPE', info.get('trailingPE', 0)),
+        "dividendYield": info.get('dividendYield', 0),
+        "fiftyTwoWeekHigh": info.get('fiftyTwoWeekHigh', 0),
+        "fiftyTwoWeekLow": info.get('fiftyTwoWeekLow', 0),
+        "summary": info.get('longBusinessSummary', ''),
+        "news": processed_news
+    }
+
 def fetch_and_preprocess(symbol):
     logger.info(f"Preprocessing data for model training: {symbol}")
     ticker = yf.Ticker(symbol)

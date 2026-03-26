@@ -50,6 +50,16 @@ export const stockService = {
     }
   },
 
+  getStockInfo: async (symbol) => {
+    try {
+      const response = await api.get('/info', { params: { symbol } });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching stock info:', error);
+      throw error;
+    }
+  },
+
   predictStock: async (symbol, days, model) => {
     try {
       const response = await api.post('/predict', {
@@ -72,6 +82,36 @@ export const stockService = {
       console.error('Error fetching models:', error);
       throw error;
     }
+  },
+
+  getWatchlist: async () => {
+    const response = await api.get('/watchlist');
+    return response.data;
+  },
+
+  addToWatchlist: async (symbol) => {
+    const response = await api.post('/watchlist', { symbol });
+    return response.data;
+  },
+
+  removeFromWatchlist: async (symbol) => {
+    const response = await api.delete(`/watchlist/${symbol}`);
+    return response.data;
+  },
+
+  getPortfolio: async () => {
+    const response = await api.get('/portfolio');
+    return response.data;
+  },
+
+  addPortfolioItem: async (symbol, shares, price) => {
+    const response = await api.post('/portfolio', { symbol, shares, price });
+    return response.data;
+  },
+
+  deletePortfolioItem: async (itemId) => {
+    const response = await api.delete(`/portfolio/${itemId}`);
+    return response.data;
   }
 };
 
@@ -89,7 +129,7 @@ export const authService = {
   },
 
   googleAuth: async (credential) => {
-    const response = await api.post('/auth/google', { credential });
+    const response = await api.post('/auth/google-login', { credential });
     return response.data;
   },
 
