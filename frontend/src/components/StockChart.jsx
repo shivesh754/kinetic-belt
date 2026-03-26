@@ -13,6 +13,10 @@ const StockChart = ({ data, colors = {} }) => {
       areaBottomColor = 'rgba(16, 185, 129, 0)',
     } = colors;
 
+    if (!data || !chartContainerRef.current) return;
+
+    const width = chartContainerRef.current.clientWidth || 800;
+
     const chart = createChart(chartContainerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: backgroundColor },
@@ -22,7 +26,7 @@ const StockChart = ({ data, colors = {} }) => {
         vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
         horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
       },
-      width: chartContainerRef.current.clientWidth,
+      width: width,
       height: 400,
       timeScale: {
         borderVisible: false,
@@ -31,6 +35,7 @@ const StockChart = ({ data, colors = {} }) => {
         borderVisible: false,
       },
     });
+
 
     const newSeries = chart.addAreaSeries({
       lineColor,

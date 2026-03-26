@@ -62,7 +62,7 @@ const Dashboard = () => {
   }, [symbol, startDate, endDate]);
 
   const calculateStats = (result) => {
-    if (!result || result.close.length === 0) return;
+    if (!result || !result.close || result.close.length === 0) return;
 
     const closes = result.close;
     const highs = result.high;
@@ -178,7 +178,7 @@ const Dashboard = () => {
           title="Current Price" 
           value={stats ? stats.currentPrice : '-.--'} 
           icon={<DollarSign className="w-5 h-5" />} 
-          trend={stats ? stats.priceChange.toFixed(2) : undefined}
+          trend={stats ? Number(stats.priceChange.toFixed(2)) : undefined}
           highlight={true}
           suffix=" USD"
         />
@@ -201,7 +201,7 @@ const Dashboard = () => {
       </div>
 
       {/* Main Content Grid */}
-      <div className="flex flex-col lg:flex-row gap-6 h-[600px]">
+      <div className="flex flex-col lg:flex-row gap-6 min-h-[600px]">
         {/* Main Chart Area */}
         <div className={`transition-all duration-500 ease-in-out ${showSidebar ? 'lg:w-[75%]' : 'w-full'} glass-panel p-6 relative h-full overflow-hidden`}>
           {loading ? (
@@ -251,20 +251,20 @@ const Dashboard = () => {
                       <div>
                         <p className="text-[10px] text-gray-500">Market Cap</p>
                         <p className="text-sm font-semibold text-gray-200">
-                          ${(stockInfo.marketCap / 1e12).toFixed(2)}T
+                          ${stockInfo.marketCap ? (stockInfo.marketCap / 1e12).toFixed(2) : '--'}T
                         </p>
                       </div>
                       <div>
                         <p className="text-[10px] text-gray-500">P/E Ratio</p>
-                        <p className="text-sm font-semibold text-gray-200">{stockInfo.peRatio?.toFixed(2) || 'N/A'}</p>
+                        <p className="text-sm font-semibold text-gray-200">{stockInfo.peRatio !== undefined ? stockInfo.peRatio.toFixed(2) : 'N/A'}</p>
                       </div>
                       <div>
                         <p className="text-[10px] text-gray-500">Div. Yield</p>
-                        <p className="text-sm font-semibold text-gray-200">{(stockInfo.dividendYield * 100).toFixed(2)}%</p>
+                        <p className="text-sm font-semibold text-gray-200">{stockInfo.dividendYield !== undefined ? (stockInfo.dividendYield * 100).toFixed(2) : '0.00'}%</p>
                       </div>
                       <div>
                         <p className="text-[10px] text-gray-500">Sector</p>
-                        <p className="text-sm font-semibold text-gray-200 truncate pr-2">{stockInfo.sector}</p>
+                        <p className="text-sm font-semibold text-gray-200 truncate pr-2">{stockInfo.sector || 'N/A'}</p>
                       </div>
                     </div>
                   ) : (
